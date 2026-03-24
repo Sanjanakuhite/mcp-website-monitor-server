@@ -19,26 +19,79 @@ public class McpController {
 
     @PostMapping
     public ResponseEntity<?> handle(@RequestBody Map<String, Object> request) {
+        try {
+            String type = (String) request.get("type");
 
-        String toolName = (String) request.get("tool_name");
-        Map<String, Object> args = (Map<String, Object>) request.get("arguments");
+            // =========================
+            // 1. TOOL DISCOVERY (VERY IMPORTANT)
+            // =========================
+            if ("list_tools".equals(type)) {
+                return ResponseEntity.ok(Map.of(
+                        "tools", List.of(
+                                Map.of(
+                                        "name", "discover_website_apis",
+                                        "description", "Discover APIs from a website",
+                                        "input_schema", Map.of(
+                                                "type", "object",
+                                                "properties", Map.of(
+                                                        "website_url", Map.of("type", "string")
+                                                ),
+                                                "required", List.of("website_url")
+                                        )
+                                ),
+                                Map.of(
+                                        "name", "monitor_api_batch",
+                                        "description", "Monitor API batch health",
+                                        "input_schema", Map.of(
+                                                "type", "object",
+                                                "properties", Map.of(
+                                                        "api_batch", Map.of(
+                                                                "type", "array",
+                                                                "items", Map.of("type", "string")
+                                                        )
+                                                ),
+                                                "required", List.of("api_batch")
+                                        )
+                                )
+                        )
+                ));
+            }
 
-        if ("discover_website_apis".equals(toolName)) {
-            String url = (String) args.get("website_url");
-            return ResponseEntity.ok(Map.of(
-                    "tool_name", toolName,
-                    "result", toolService.discoverApis(url)
+            // =========================
+            // 2. TOOL EXECUTION
+            // =========================
+            String toolName = (String) request.get("tool_name");
+            Map<String, Object> args = (Map<String, Object>) request.get("arguments");
+
+            if ("discover_website_apis".equals(toolName)) {
+                String url = args.get("website_url").toString();
+
+                return ResponseEntity.ok(Map.of(
+                        "result", toolService.discoverApis(url)
+                ));
+            }
+
+            if ("monitor_api_batch".equals(toolName)) {
+                List<?> rawList = (List<?>) args.get("api_batch");
+
+                List<String> batch = rawList.stream()
+                        .map(Object::toString)
+                        .toList();
+
+                return ResponseEntity.ok(Map.of(
+                        "result", toolService.monitorBatch(batch)
+                ));
+            }
+
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Unknown tool"
+            ));
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of(
+                    "error", e.getMessage()
             ));
         }
-
-        if ("monitor_api_batch".equals(toolName)) {
-            List<String> batch = (List<String>) args.get("api_batch");
-            return ResponseEntity.ok(Map.of(
-                    "tool_name", toolName,
-                    "result", toolService.monitorBatch(batch)
-            ));
-        }
-
-        return ResponseEntity.badRequest().body(Map.of("error", "Unknown tool"));
     }
 }
